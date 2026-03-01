@@ -1,0 +1,20 @@
+# Build output
+dist/
+
+# Node modules folder
+node_modules/
+
+# Auto-updater temp files
+.update-temp/
+
+# Python cache
+__pycache__/
+
+# Build artifacts
+*.exe
+
+# Certificates (generated at runtime)
+certs/
+
+# Databases (user data)
+*.db

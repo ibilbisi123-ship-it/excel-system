@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <title>Excel AI Assistant</title>
+    <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+    <link rel="stylesheet" href="taskpane.css">
+    <!-- Webpack will inject bundled scripts for polyfill and taskpane automatically -->
+    <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https:; script-src 'self' https: 'unsafe-inline' 'unsafe-eval'; connect-src *">
+    <!-- Removed meta color-scheme for IE compatibility -->
+</head>
+
+<body data-theme="dark">
+    <!-- License Gate Overlay -->
+    <div id="licenseGate" class="license-gate">
+        <div class="license-gate__card">
+            <img src="/assets/logo-filled2.png" alt="App logo" class="license-gate__logo" />
+            <h2 class="license-gate__title">Activate Your License</h2>
+            <p class="license-gate__subtitle">Enter your license key to unlock the Excel AI Assistant.</p>
+            <div class="license-gate__form">
+                <input type="text" id="licenseKeyInput" class="form-control license-gate__input"
+                    placeholder="e.g. e4d71210-e7d6-44bf-a1da-dcbea46d8174" spellcheck="false" autocomplete="off" />
+                <button class="btn btn--primary license-gate__btn" id="activateLicenseBtn">Activate</button>
+            </div>
+            <div id="licenseError" class="license-gate__error" role="alert"></div>
+        </div>
+    </div>
+
+    <div class="task-pane task-pane--with-sidebar">
+        <!-- Sidebar Navigation (overlay) -->
+        <nav class="sidebar sidebar--right sidebar--overlay" aria-label="Sections">
+            <div class="sidebar-header">
+                <img src="/assets/logo-filled2.png" alt="App logo" class="sidebar-logo" />
+                <button id="toggleSidebar" class="btn btn--sm btn--outline sidebar-close-btn" aria-expanded="true"
+                    title="Close sidebar">Close</button>
+            </div>
+            <ul class="sidebar-menu">
+                <li class="sidebar-item active" data-target="#tab-chat">
+                    <button class="sidebar-link" title="Chatbot">
+                        <span class="icon">💬</span>
+                        <span class="label">Chatbot</span>
+                    </button>
+                </li>
+                <li class="sidebar-item" data-target="#tab-settings">
+                    <button class="sidebar-link" title="Settings">
+                        <span class="icon">⚙️</span>
+                        <span class="label">Settings</span>
+                    </button>
+                </li>
+                <li class="sidebar-item" data-target="#tab-slot3">
+                    <button class="sidebar-link" title="Cable Filler">
+                        <span class="icon">🔌</span>
+                        <span class="label">Cable Filler</span>
+                    </button>
+                </li>
+                <li class="sidebar-item" data-target="#tab-slot4">
+                    <button class="sidebar-link" title="Templates">
+                        <span class="icon">📜</span>
+                        <span class="label">Templates</span>
+                    </button>
+                </li>
+                <li class="sidebar-item" data-target="#tab-formulas">
+                    <button class="sidebar-link" title="Formulas">
+                        <span class="icon">ƒx</span>
+                        <span class="label">Formulas</span>
+                    </button>
+                </li>
+                <li class="sidebar-item" data-target="#tab-mhr">
+                    <button class="sidebar-link" title="Mhr &amp; Cost calculator">
+                        <span class="icon">👷</span>
+                        <span class="label">Mhr &amp; Cost calculator</span>
+                    </button>
+                </li>
+                <li class="sidebar-item" data-target="#tab-mto">
+                    <button class="sidebar-link" title="MTO System">
+                        <span class="icon">📐</span>
+                        <span class="label">MTO System</span>
+                    </button>
+                </li>
+                <li class="sidebar-item" data-target="#tab-reference">
+                    <button class="sidebar-link" title="Reference Finder">
+                        <span class="icon">🔍</span>
+                        <span class="label">Reference Finder</span>
+                    </button>
+                </li>
+            </ul>
+            <div class="sidebar-footer">
+                <span class="sidebar-version" id="appVersionDisplay">v1.0.0</span>
+            </div>
+        </nav>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Floating button to open sidebar overlay -->
+            <button class="floating-toggle" id="openSidebarBtn" aria-expanded="false" title="Open menu">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="3" y1="6" x2="21" y2="6"></line>
+                    <line x1="3" y1="12" x2="21" y2="12"></line>
+                    <line x1="3" y1="18" x2="21" y2="18"></line>
+                </svg>
+            </button>
+
+            <!-- Update Notification Banner -->
+            <div id="updateBanner" class="update-banner hidden" role="alert">
+                <div class="update-banner__content">
+                    <span class="update-banner__icon">🔄</span>
+                    <span class="update-banner__text" id="updateBannerText">A new version is available!</span>
+                </div>
+                <div class="update-banner__actions">
+                    <span class="update-banner__version" id="updateBannerVersion"></span>
+                    <button class="update-banner__dismiss" id="dismissUpdateBtn" title="Dismiss">✕</button>
+                </div>
+            </div>
+
+            <!-- Tab: Chatbot -->
+            <section id="tab-chat" class="tab-panel active" role="region" aria-label="Chatbot">
+                <!-- Chat Interface -->
+                <div class="chat-container">
+                    <div class="chat-header">
+                        <h3>AI Assistant</h3>
+                        <div class="chat-header-actions">
+                            <button class="btn btn--outline btn--sm" id="toggleExcelContext" aria-expanded="false"
+                                title="Show sheet tools">Sheet</button>
+                            <button class="btn btn--outline btn--sm" id="clearChat">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <polyline points="3,6 5,6 21,6"></polyline>
+                                    <path
+                                        d="m19,6v14a2,2 0,0 1,-2,2H7a2,2 0,0 1,-2,-2V6m3,0V4a2,2 0,0 1,2,-2h4a2,2 0,0 1,2,2v2">
+                                    </path>
+                                </svg>
+                                Clear
+                            </button>
+                        </div>
+                    </div>
+                    <!-- Excel Context (collapsible inside chat tab) -->
+                    <div class="excel-context-panel hidden" id="excelContextPanel">
+                        <h3>Excel Context</h3>
+                        <div class="context-info">
+                            <div class="context-item">
+                                <label>Selected Range:</label>
+                                <span id="selectedRange">A1:C10</span>
+                            </div>
+                            <div class="context-actions">
+                                <button class="btn btn--outline btn--sm" id="readSelection">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                        <polyline points="14,2 14,8 20,8"></polyline>
+                                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                                        <polyline points="10,9 9,9 8,9"></polyline>
+                                    </svg>
+                                    Read Data
+                                </button>
+                                <button class="btn btn--outline btn--sm" id="insertResponse"
+                                    title="Insert the last AI message into selection">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <path d="M20 14.66V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5.34">
+                                        </path>
+                                        <polygon points="18,2 22,6 12,16 8,16 8,12 18,2"></polygon>
+                                    </svg>
+                                    Insert to Excel
+                                </button>
+                                <button class="btn btn--outline btn--sm" id="applyLastAction"
+                                    title="Apply the last parsed action">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <polyline points="20 6 9 17 4 12"></polyline>
+                                    </svg>
+                                    Apply last action
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chat-messages" id="chatMessages">
+                        <div class="message ai-message">
+                            <div class="message-avatar ai-avatar">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <circle cx="12" cy="12" r="5"></circle>
+                                    <line x1="12" y1="1" x2="12" y2="3"></line>
+                                    <line x1="12" y1="21" x2="12" y2="23"></line>
+                                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                                    <line x1="1" y1="12" x2="3" y2="12"></line>
+                                    <line x1="21" y1="12" x2="23" y2="12"></line>
+                                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                                </svg>
+                            </div>
+                            <div class="message-content">
+                                <div class="message-text">Hello! I'm your Excel AI Assistant. Ask me anything about your
+                                    Excel data, formulas, or analysis.</div>
+                                <div class="message-time">Just now</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chat-input-container">
+                        <div class="chat-input-wrapper">
+                            <textarea class="chat-input" id="chatInput"
+                                placeholder="Ask me about your Excel data, formulas, or analysis..."
+                                rows="1"></textarea>
+                            <button class="chat-send-btn" id="sendBtn" aria-label="Send message" title="Send message">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                                    <polygon points="22,2 15,22 11,13 2,9 22,2"></polygon>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="input-actions">
+                            <div class="status-indicator" id="statusIndicator"><span class="status-text">Ready</span>
+                            </div>
+                            <div class="input-hint">Press Enter to send, Shift+Enter for new line</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tab: Settings -->
+            <section id="tab-settings" class="tab-panel" role="region" aria-label="Settings">
+                <div class="config-panel">
+                    <div class="config-header">
+                        <h3>Settings</h3>
+                    </div>
+                    <div class="config-content show">
+                        <div class="form-group">
+                            <label class="form-label">Direct Excel Actions</label>
+                            <div class="form-hint">Let the assistant write formulas and values to your workbook when it
+                                recognizes a clear instruction.</div>
+                            <label class="btn btn--sm checkbox-inline">
+                                <input type="checkbox" id="chkDirectActions" class="mr-8" checked />
+                                Enable direct actions
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Prompt Version</label>
+                            <div class="form-hint">Current: <span id="promptVersionDisplay">3</span></div>
+                            <div class="form-hint">You can change it from Console:
+                                <code>window.setPromptVersion('3')</code>
+                            </div>
+                        </div>
+                        <div class="form-group"
+                            style="margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--color-border);">
+                            <label class="form-label">License</label>
+                            <div class="form-hint">Deactivate your current license key to switch accounts or re-enter a
+                                new key.</div>
+                            <button class="btn btn--outline btn--sm" id="deactivateLicenseBtn"
+                                style="margin-top: 6px;">Deactivate License</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slot 3: Cable Filler -->
+            <section id="tab-slot3" class="tab-panel" role="region" aria-label="Cable Filler">
+                <div class="config-panel">
+                    <div class="config-header">
+                        <h3>Cable Filler</h3>
+                    </div>
+                    <div class="config-content show">
+                        <p>Run the cable filler transformation on the currently active worksheet starting at row 11.</p>
+                        <button class="btn" id="runCableFiller">Run Cable Filler</button>
+                        <div class="form-hint">This will write formulas and then convert them to values across several
+                            columns.</div>
+                    </div>
+                </div>
+            </section>
+            <section id="tab-slot4" class="tab-panel" role="region" aria-label="Slot 4">
+                <div class="config-panel">
+                    <div class="config-header">
+                        <h3>Templates</h3>
+                    </div>
+                    <div class="config-content show">
+                        <p>Choose a template (.xlsx) from the dropdown to insert its sheets into this workbook.</p>
+                        <div style="position: relative; display: inline-block;">
+                            <button class="btn" id="templateDropdownBtn" aria-haspopup="true" aria-expanded="false">
+                                Insert Template ▼
+                            </button>
+                            <div id="templateMenu" class="dropdown-menu hidden" role="menu" aria-label="Templates"
+                                style="
+                                position: absolute; top: 100%; left: 0; z-index: 1000; min-width: 240px;
+                                background: var(--panel-bg, #1e1e1e); border: 1px solid rgba(255,255,255,0.1);
+                                box-shadow: 0 4px 12px rgba(0,0,0,0.3); padding: 6px; border-radius: 6px;
+                              ">
+                                <div id="templateMenuItems" style="max-height: 240px; overflow-y: auto;"></div>
+                                <div id="templateMenuEmpty" class="form-hint" style="padding: 6px;">No templates found.
+                                    Add .xlsx files under <code>assets/templates</code> and update
+                                    <code>templates.json</code>.
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-hint">Place .xlsx templates in <code>assets/templates</code> and list them in
+                            <code>assets/templates/templates.json</code>.
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slot: Formulas (copy to clipboard) -->
+            <section id="tab-formulas" class="tab-panel" role="region" aria-label="Formulas">
+                <div class="config-panel">
+                    <div class="config-header">
+                        <h3>Common Excel Formulas</h3>
+                    </div>
+                    <div class="config-content show">
+                        <p>Click any formula to copy it to your clipboard.</p>
+                        <div id="formulasList" class="formula-list">
+                            <button class="btn btn--outline btn--sm formula-btn"
+                                data-formula="=SUM(number1, [number2], ...)">=SUM(number1, [number2], ...)</button>
+                            <button class="btn btn--outline btn--sm formula-btn"
+                                data-formula="=IF(logical_test, value_if_true, value_if_false)">=IF(logical_test,
+                                value_if_true, value_if_false)</button>
+                            <button class="btn btn--outline btn--sm formula-btn"
+                                data-formula="=AVERAGE(number1, [number2], ...)">=AVERAGE(number1, [number2],
+                                ...)</button>
+                            <button class="btn btn--outline btn--sm formula-btn"
+                                data-formula="=VLOOKUP(lookup_value, table_array, col_index_num, [range_lookup])">=VLOOKUP(lookup_value,
+                                table_array, col_index_num, [range_lookup])</button>
+                            <button class="btn btn--outline btn--sm formula-btn"
+                                data-formula="=INDEX(array, row_num, [column_num])">=INDEX(array, row_num,
+                                [column_num])</button>
+                            <button class="btn btn--outline btn--sm formula-btn"
+                                data-formula="=MATCH(lookup_value, lookup_array, [match_type])">=MATCH(lookup_value,
+                                lookup_array, [match_type])</button>
+                            <button class="btn btn--outline btn--sm formula-btn"
+                                data-formula="=CONCATENATE(text1, [text2], ...)">=CONCATENATE(text1, [text2],
+                                ...)</button>
+                            <button class="btn btn--outline btn--sm formula-btn"
+                                data-formula="=TRIM(text)">=TRIM(text)</button>
+                            <button class="btn btn--outline btn--sm formula-btn"
+                                data-formula="=UPPER(text)">=UPPER(text)</button>
+                            <button class="btn btn--outline btn--sm formula-btn"
+                                data-formula="=LOWER(text)">=LOWER(text)</button>
+                            <button class="btn btn--outline btn--sm formula-btn"
+                                data-formula="=ROUND(number, num_digits)">=ROUND(number, num_digits)</button>
+                            <button class="btn btn--outline btn--sm formula-btn"
+                                data-formula="=COUNTIF(range, criteria)">=COUNTIF(range, criteria)</button>
+                        </div>
+                        <div class="form-hint">Tip: Paste into the formula bar or a cell to use it immediately.</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slot: Mhr & Cost calculator -->
+            <section id="tab-mhr" class="tab-panel" role="region" aria-label="Mhr &amp; Cost calculator">
+                <!-- Panel 1: Mhr & Cost -->
+                <div class="config-panel">
+                    <div class="config-header">
+                        <h3>Mhr Calculator</h3>
+                        <div class="config-content show">
+                            <p> <code></code>
+                                <code></code> <code></code> <code></code>.
+                            </p>
+                            <div class="form-group">
+                                <label class="form-label">Top Matches <span class="form-hint">(1-20)</span></label>
+                                <input type="number" id="mhrTopMatches" class="form-control" value="5" min="1"
+                                    max="20" />
+                            </div>
+                            <div class="form-group">
+                                <button class="btn" id="runMhrCostCalc">Process current sheet</button>
+                            </div>
+                            <div class="form-group">
+                                <button class="btn btn--outline" id="learnFromExcelBtn"
+                                    title="Select a cell with MHR value to learn">Learn from Excel</button>
+                            </div>
+                            <div class="form-hint">Requires a header row with <code>Description</code>. <code></code>,
+                                <code>Cable termination Mhr</code>, <code>Rate</code>.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Panel 2: Price (my2.db) -->
+                    <div class="config-panel mt-10">
+                        <div class="config-header">
+                            <h3>Cost Calculator</h3>
+                        </div>
+                        <div class="config-content show">
+                            <p> <code></code> <code></code> <code></code></p>
+                            <div class="form-group">
+                                <label class="form-label">Top Matches <span class="form-hint">(1-20)</span></label>
+                                <input type="number" id="priceTopMatches" class="form-control" value="5" min="1"
+                                    max="20" />
+                            </div>
+                            <div class="form-group">
+                                <button class="btn btn--outline" id="runPriceCalc">Calculate Price (my2.db)</button>
+                            </div>
+                            <div class="form-hint">Default DB path is workspace root <code>my2.db</code>. Configure via
+                                env: <code>PRICE_DB</code>, <code>PRICE_TABLE</code>, <code>PRICE_DESC_COL</code>,
+                                <code>PRICE_VALUE_COL</code>.
+                            </div>
+                        </div>
+                    </div>
+            </section>
+
+            <!-- Tab: MTO System -->
+            <section id="tab-mto" class="tab-panel" role="region" aria-label="MTO System">
+                <div class="config-panel">
+                    <div class="config-header">
+                        <h3>MTO System Connection</h3>
+                    </div>
+                    <div class="config-content show">
+                        <div class="form-group">
+                            <label class="form-label" for="mtoServerUrl">MTO Server URL</label>
+                            <input type="text" id="mtoServerUrl" class="form-control" value="http://localhost:8010"
+                                placeholder="e.g. http://localhost:8010">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Live Sync</label>
+                            <div class="form-hint">Automatically fetch annotations from MTO System.</div>
+                            <label class="btn btn--sm checkbox-inline">
+                                <input type="checkbox" id="mtoLiveSync" class="mr-8">
+                                Enable Live Sync
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <button class="btn" id="mtoSyncNowBtn">Sync Now</button>
+                        </div>
+                        <div class="status-indicator" id="mtoStatus"><span class="status-text">Not Connected</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tab: Reference Finder -->
+            <section id="tab-reference" class="tab-panel" role="region" aria-label="Reference Finder">
+                <div class="config-panel">
+                    <div class="config-header">
+                        <h3>Reference Finder</h3>
+                    </div>
+                    <div class="config-content show">
+                        <p>Search for files matching the selected cells and add hyperlinks.</p>
+                        <div class="form-group">
+                            <label class="form-label" for="referenceFolderPath">Local Folder Path</label>
+                            <div style="display: flex; gap: 8px;">
+                                <input type="text" id="referenceFolderPath" class="form-control"
+                                    placeholder="e.g. C:\Users\ibrah\Documents" style="flex: 1;">
+                                <button class="btn btn--outline" id="browseFolderBtn"
+                                    title="Browse for folder">Browse</button>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <button class="btn" id="runReferenceSearchBtn">Search and Link Selected Cells</button>
+                        </div>
+                        <div class="status-indicator" id="referenceStatus"><span class="status-text">Ready</span></div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Overlay Backdrop -->
+        <div id="sidebarBackdrop" class="sidebar-backdrop hidden" aria-hidden="true"></div>
+
+        <!-- Loading Overlay -->
+        <div class="loading-overlay hidden" id="loadingOverlay">
+            <div class="loading-spinner"></div>
+            <div class="loading-text">Processing your request...</div>
+        </div>
+
+        <!-- Toast Notification -->
+        <div id="toast" class="toast" role="status" aria-live="polite" aria-atomic="true">Copied to clipboard</div>
+    </div>
+</body>
+
+</html>
