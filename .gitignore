@@ -12,6 +12,8 @@ __pycache__/
 
 # Build artifacts
 *.exe
+release/
+excel-addin-release.zip
 
 # Certificates (generated at runtime)
 certs/
